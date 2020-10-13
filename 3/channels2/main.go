@@ -6,7 +6,6 @@ import (
 	"net/url"
 	"os"
 	"os/signal"
-	"sync"
 )
 
 type ContentType string
@@ -70,26 +69,21 @@ func main() {
 		contents = append(contents, c)
 	}
 
-	g := sync.WaitGroup{}
-
 	var src chan *Content = make(chan *Content)
-	g.Add(1)
 	var dstErr chan error = make(chan error)
-	g.Add(1)
 
-	var s1 chan *Content = make(chan *Content)
-	g.Add(1)
-	var s2 chan *Content = make(chan *Content)
-	g.Add(1)
-	go parseURL(&g, src, s1, dstErr)
-	go whichKind(&g, s1, s2, dstErr)
-	go printContent(&g, s2, dstErr)
-	go func(g *sync.WaitGroup) {
+	printContent(
+		whichKind(
+			parseURL(src, dstErr),
+			dstErr,
+		),
+		dstErr,
+	)
+	go func() {
 		for err := range dstErr {
 			fmt.Printf("Error is occured: %+v\n", err)
 		}
-		g.Done()
-	}(&g)
+	}()
 
 	for i := range contents {
 		src <- &contents[i]
@@ -97,65 +91,72 @@ func main() {
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt)
-	go func() {
-		<-sig
-		close(src)
-		close(dstErr)
-		close(s1)
-		close(s2)
-	}()
-
-	g.Wait()
+	end := make(chan bool)
+	<-sig
+	close(src)
+	close(dstErr)
+	close(end)
+	<-end
 }
 
 func parseURL(
-	g *sync.WaitGroup,
 	src <-chan *Content,
-	dst chan<- *Content,
 	dstErr chan<- error,
-) {
-	for c := range src {
-		var err error
-		c.URL, err = url.Parse(c.RawURL)
-		if err != nil {
-			dstErr <- err
-			continue
+) chan *Content {
+	var dst chan *Content = make(chan *Content)
+	go func() {
+		defer close(dst)
+		for c := range src {
+			var err error
+			c.URL, err = url.Parse(c.RawURL)
+			if err != nil {
+				dstErr <- err
+				continue
+			}
+			dst <- c
 		}
-		dst <- c
-	}
-	g.Done()
+	}()
+	fmt.Println("End parseURL")
+	return dst
 }
 
 func whichKind(
-	g *sync.WaitGroup,
 	src <-chan *Content,
-	dst chan<- *Content,
 	dstErr chan<- error,
-) {
-	for c := range src {
-		if c.URL.Host == "twitter.com" || c.URL.Host == "www.facebook.com" {
-			c.Kind = KindSNS
-		} else if c.URL.Host == "2ch.com" || c.URL.Host == "bakusai" {
-			c.Kind = KindForum
-		} else if c.URL.Host == "www.tiktok.com" || c.URL.Host == "www.youtube.com" {
-			c.Kind = KindVideo
-		} else if c.URL.Host == "www.yahoo.co.jp" {
-			c.Kind = KindNews
-		} else {
-			c.Kind = KindUnknown
+) chan *Content {
+	var dst chan *Content = make(chan *Content)
+	go func() {
+		defer close(dst)
+		for c := range src {
+			if c.URL.Host == "twitter.com" || c.URL.Host == "www.facebook.com" {
+				c.Kind = KindSNS
+			} else if c.URL.Host == "2ch.com" || c.URL.Host == "bakusai" {
+				c.Kind = KindForum
+			} else if c.URL.Host == "www.tiktok.com" || c.URL.Host == "www.youtube.com" {
+				c.Kind = KindVideo
+			} else if c.URL.Host == "www.yahoo.co.jp" {
+				c.Kind = KindNews
+			} else {
+				c.Kind = KindUnknown
+			}
+			dst <- c
 		}
-		dst <- c
-	}
-	g.Done()
+	}()
+	fmt.Println("End whichKind")
+	return dst
 }
 
 func printContent(
-	g *sync.WaitGroup,
 	src <-chan *Content,
 	dstErr chan<- error,
-) {
-	for c := range src {
-		fmt.Println(c)
-	}
-	g.Done()
+) chan *Content {
+	var dst chan *Content = make(chan *Content)
+	go func() {
+		defer close(dst)
+		for c := range src {
+			fmt.Println(c)
+		}
+	}()
+	fmt.Println("End printContent")
+	return dst
 }
