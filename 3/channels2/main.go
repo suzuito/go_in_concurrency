@@ -72,7 +72,7 @@ func main() {
 	var src chan *Content = make(chan *Content)
 	var dstErr chan error = make(chan error)
 
-	printContent(
+	dst := printContent(
 		whichKind(
 			parseURL(src, dstErr),
 			dstErr,
@@ -93,10 +93,14 @@ func main() {
 	signal.Notify(sig, os.Interrupt)
 	end := make(chan bool)
 	<-sig
+	fmt.Println("aaa")
 	close(src)
 	close(dstErr)
+	close(dst)
 	close(end)
+	fmt.Println("aaa")
 	<-end
+	fmt.Println("aaa")
 }
 
 func parseURL(
