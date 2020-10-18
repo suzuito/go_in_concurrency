@@ -128,7 +128,7 @@ func whichKind(
 	src <-chan *Content,
 	dstErr chan<- error,
 ) chan *Content {
-	var dst chan *Content = make(chan *Content)
+	dst := make(chan *Content)
 	go func() {
 		defer close(dst)
 		for c := range src {
