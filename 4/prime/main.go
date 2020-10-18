@@ -3,7 +3,7 @@ package main
 import "fmt"
 
 func main() {
-	const n = int64(1_000_000_000)
+	const n = int64(1_000_000_000) - 2 /* 0と1のぶんを予め引いておく */
 	const start = int64(2)
 
 	l := int64(0) // 素数ではない数の個数
@@ -49,5 +49,5 @@ func main() {
 	// }
 	// fmt.Printf("%d\n", s)
 
-	fmt.Println(n - l - 2)
+	fmt.Println(n - l)
 }
